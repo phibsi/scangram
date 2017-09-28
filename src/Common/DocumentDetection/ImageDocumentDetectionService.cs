@@ -12,6 +12,7 @@ namespace Scangram.Common.DocumentDetection
         private readonly IImageExtractor _extractor;
         private readonly IContourDetector[] _contourDetectors;
         private readonly IResultScorer[] _scorers;
+        private readonly IImagePostProcessor[] _postProcessors;
 
         public ImageDocumentDetectionService(
             IImagePreProcessor[] preProcessors,
@@ -24,6 +25,7 @@ namespace Scangram.Common.DocumentDetection
             _extractor = extractor;
             _contourDetectors = contourDetectors;
             _scorers = scorers;
+            _postProcessors = postProcessors;
         }
 
         public void ProcessImageInteractive(string path)
@@ -134,9 +136,18 @@ namespace Scangram.Common.DocumentDetection
                     {
                         Cv2.DrawContours(preProcessedImage, new List<IEnumerable<Point>> { contour.Points }, -1, Scalar.White, 2);
 
-                        using (var resultImage = _extractor.Extract(image, contour.Points))
+                        var resultImage = _extractor.Extract(image, contour.Points);
+                        try
                         {
+                            foreach(var postProcessor in _postProcessors) {
+                                postProcessor.PostProcessImage(ref resultImage, image);
+                            }
+
                             return resultImage.ToMemoryStream(".jpg", new ImageEncodingParam(ImwriteFlags.JpegQuality, 95));
+                        }
+                        finally
+                        {
+                            resultImage.Dispose();
                         }
                     }
                 }
